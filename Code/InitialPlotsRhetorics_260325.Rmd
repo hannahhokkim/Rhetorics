@@ -1,0 +1,249 @@
+---
+title: "Epistemological Beliefs and Open Science Analysis"
+author: "Analysis Script"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(psych)     # For Alpha reliability
+library(car)       # For VIF and Type III ANOVA
+library(sjPlot)    # For beautiful tables and plots
+library(broom)
+library(ggpubr)# For tidying model outputs
+library(patchwork)
+```
+
+```{r}
+raw_data <- read_csv("Rhetroics_recoded_survey_data_031836.csv")
+
+df <- raw_data[-c(1, 2), ]
+
+item_cols <- c(paste0("pos", 1:5), paste0("inc", 1:4), paste0("neut", 1:5))
+outcome_cols <- c("datashare_opinion", "prereg_opinion", "OA_opinion", "replication_opinion",
+                  "datashare_behavior", "prereg_behavior", "OA_behavior")
+
+df <- df %>%
+  mutate(across(all_of(c(item_cols, outcome_cols)), as.numeric)) %>%
+  mutate(discipline = as.factor(discipline),
+         qualquant = as.factor(qualquant))
+```
+
+```{r}
+rev_5 <- function(x) { 6 - x }
+
+df <- df %>%
+  mutate(
+    # Inclusivity: Reverse-key 3 and 4
+    inc3_r = rev_5(inc3),
+    inc4_r = rev_5(inc4),
+    # Neutrality: Reverse-key 1 and 3
+    neut1_r = rev_5(neut1),
+    neut3_r = rev_5(neut3)
+  )
+df <- df %>%
+  filter(!is.na(field)) %>%
+  mutate(field = case_when(
+    field %in% c("communication", "communications") ~ "Communication",
+    field %in% c("political", "political science") ~ "Political Science",
+    TRUE ~ str_to_title(field) # Capitalize others (e.g., psychology -> Psychology)
+  ))
+
+# Reliability Checks (Cronbach's Alpha)
+alpha_pos  <- psych::alpha(df[paste0("pos", 1:5)])
+alpha_inc  <- psych::alpha(df[c("inc1", "inc2", "inc3_r", "inc4_r")])
+alpha_neut <- psych::alpha(df[c("neut1_r", "neut2", "neut3_r", "neut4", "neut5")])
+
+# Print Alphas
+cat("Cronbach's Alpha Results:\n",
+    "Positivism: ", round(alpha_pos$total$raw_alpha, 2), "\n",
+    "Inclusivity:", round(alpha_inc$total$raw_alpha, 2), "\n",
+    "Neutrality: ", round(alpha_neut$total$raw_alpha, 2), "\n")
+
+df <- df %>%
+  mutate(
+    Positivism = rowMeans(select(., pos1:pos5), na.rm = TRUE),
+    Inclusivity = rowMeans(select(., inc1, inc2, inc3_r, inc4_r), na.rm = TRUE),
+    Neutrality = rowMeans(select(., neut1_r, neut2, neut3_r, neut4, neut5), na.rm = TRUE)
+  )
+```
+##DESCRIPTIVES
+```{r}
+epistemic_table <- df %>%
+  group_by(field) %>%
+  summarise(
+    N = n(),
+    Pos_M = mean(Positivism, na.rm = TRUE), Pos_SD = sd(Positivism, na.rm = TRUE),
+    Inc_M = mean(Inclusivity, na.rm = TRUE), Inc_SD = sd(Inclusivity, na.rm = TRUE),
+    Neut_M = mean(Neutrality, na.rm = TRUE), Neut_SD = sd(Neutrality, na.rm = TRUE)
+  ) %>%
+  arrange(desc(Pos_M))
+
+print(epistemic_table)
+
+# Create individual plots
+p1 <- ggplot(df, aes(x = reorder(field, Positivism, median, na.rm=TRUE), y = Positivism, fill = field)) +
+  geom_boxplot(alpha = 0.6, outlier.shape = NA) + geom_jitter(alpha = 0.2, width = 0.2) +
+  coord_flip() + theme_minimal() + guides(fill = "none") +
+  labs(title = "Positivism by Field", x = "Field", y = "Score")
+
+p2 <- ggplot(df, aes(x = reorder(field, Inclusivity, median, na.rm=TRUE), y = Inclusivity, fill = field)) +
+  geom_boxplot(alpha = 0.6, outlier.shape = NA) + geom_jitter(alpha = 0.2, width = 0.2) +
+  coord_flip() + theme_minimal() + guides(fill = "none") +
+  labs(title = "Inclusivity by Field", x = "", y = "Score")
+
+p3 <- ggplot(df, aes(x = reorder(field, Neutrality, median, na.rm=TRUE), y = Neutrality, fill = field)) +
+  geom_boxplot(alpha = 0.6, outlier.shape = NA) + geom_jitter(alpha = 0.2, width = 0.2) +
+  coord_flip() + theme_minimal() + guides(fill = "none") +
+  labs(title = "Neutrality by Field", x = "", y = "Score")
+
+final_plot <- (p1 | p2 | p3) + 
+  plot_annotation(
+    title = "Epistemological Profiles Across Research Fields",
+
+  )
+
+
+final_plot
+
+```
+
+```{r}
+method_descriptives <- df %>%
+  group_by(qualquant) %>%
+  summarise(across(c(Positivism, Inclusivity, Neutrality), 
+                   list(M = ~mean(., na.rm = TRUE), SD = ~sd(., na.rm = TRUE))))
+prop_qual_col <- "qualquantField_1"
+
+print(method_descriptives)
+
+belief_corrs_data <- df %>%
+  select(Positivism, Inclusivity, Neutrality, all_of(prop_qual_col)) %>%
+  mutate(across(everything(), ~as.numeric(as.character(.)))) %>%
+  drop_na()
+
+print(belief_corrs_data[prop_qual_col, 1:3])
+
+
+df_long <- df %>%
+  pivot_longer(cols = c(Positivism, Inclusivity, Neutrality), 
+               names_to = "Scale", values_to = "Score")
+
+ggplot(df_long, aes(x = Scale, y = Score, fill = qualquant)) +
+  stat_summary(fun = mean, geom = "bar", position = position_dodge(0.9)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
+               position = position_dodge(0.9), width = 0.2) +
+  theme_minimal() +
+  labs(title = "Epistemology Scores by Methodological Orientation",
+       subtitle = "Error bars represent 95% Confidence Intervals",
+       y = "Mean Score (1-5)", x = "Belief Scale", fill = "Primary Method") +
+  scale_fill_brewer(palette = "Set2")
+
+p1 <- ggplot(belief_corrs_data, aes(x = !!sym(prop_qual_col), y = Positivism)) +
+  geom_point(alpha = 0.3, color = "steelblue") + 
+  geom_smooth(method = "lm", color = "darkred") +
+  theme_minimal() + labs(x = "% Qualitative in Field", title = "Positivism")
+
+p2 <- ggplot(belief_corrs_data, aes(x = !!sym(prop_qual_col), y = Inclusivity)) +
+  geom_point(alpha = 0.3, color = "steelblue") + 
+  geom_smooth(method = "lm", color = "darkred") +
+  theme_minimal() + labs(x = "% Qualitative in Field", y = "", title = "Inclusivity")
+
+p3 <- ggplot(belief_corrs_data, aes(x = !!sym(prop_qual_col), y = Neutrality)) +
+  geom_point(alpha = 0.3, color = "steelblue") + 
+  geom_smooth(method = "lm", color = "darkred") +
+  theme_minimal() + labs(x = "% Qualitative in Field", y = "", title = "Neutrality")
+
+# Combine
+p1 + p2 + p3 + plot_annotation(title = "Epistemological Beliefs by Perceived Disciplinary Method")
+
+```
+
+```{r}
+df_plot <- df_long %>%
+  filter(!is.na(qualquant), !is.na(Score)) %>%
+  mutate(Scale = factor(Scale, levels = c("Positivism", "Inclusivity", "Neutrality")))
+
+ggplot(df_plot, aes(x = Scale, y = Score, fill = qualquant)) +
+  stat_summary(fun = mean, geom = "bar", position = position_dodge(0.9)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", 
+               position = position_dodge(0.9), width = 0.2) +
+  theme_minimal() +
+  labs(
+    title = "Epistemology Scores by Qual or Quant",
+    y = "Mean Score (1-5)", 
+    x = "Belief Scale", 
+    fill = "Primary Method"
+  ) +
+  scale_fill_brewer(palette = "Set2")
+
+```
+
+```{r}
+
+os_opinion_items <- c("datashare_opinion", "prereg_opinion", "OA_opinion", "replication_opinion")
+os_behavior_items <- c("datashare_behavior", "prereg_behavior", "OA_behavior", "replication_behavior")
+
+df_os_att <- df %>%
+  select(field, qualquant, all_of(os_opinion_items)) %>%
+  pivot_longer(cols = all_of(os_opinion_items), names_to = "Domain", values_to = "Score")
+
+ggplot(df_os_att, aes(x = field, y = Score, fill = qualquant)) +
+  stat_summary(fun = mean, geom = "bar", position = "dodge") +
+  facet_wrap(~Domain) + coord_flip() +
+  theme_minimal() + labs(title = "H3a: OS Attitudes across Disciplines and Methods")
+
+```
+
+
+
+
+Datashare opinion
+```{r}
+vars <- c("datashare_opinion", "field", "qualquant",
+          "Positivism", "Inclusivity", "Neutrality")
+
+df2 <- df[complete.cases(df[, vars]), vars]
+
+model_structure <- lm(datashare_opinion ~ field, data = df2)
+model_full <- lm(datashare_opinion ~ field + Positivism + Inclusivity + Neutrality, data = df2)
+
+anova(model_structure, model_full)
+
+vif(model_full)
+```
+
+```{r}
+outcomes <- c("datashare_opinion", "prereg_opinion", "OA_opinion", "replication_opinion",
+              "datashare_behavior", "prereg_behavior", "OA_behavior")
+
+results <- lapply(outcomes, function(y) {
+  
+  vars <- c(y, "field", "Positivism", "Inclusivity", "Neutrality")
+  df2 <- df[complete.cases(df[, vars]), vars]
+  
+  m1 <- lm(as.formula(paste(y, "~ field")), data = df2)
+  m2 <- lm(as.formula(paste(y, "~ field + Positivism + Inclusivity + Neutrality")), data = df2)
+  
+  list(
+    outcome = y,
+    anova = anova(m1, m2),
+    vif = car::vif(m2),
+    n = nrow(df2)
+  )
+})
+
+summary_table <- do.call(rbind, lapply(results, function(res) {
+  data.frame(
+    outcome = res$outcome,
+    F = res$anova$F[2],
+    p = res$anova$`Pr(>F)`[2],
+    n = res$n
+  )
+}))
+
+summary_table
+
+```
