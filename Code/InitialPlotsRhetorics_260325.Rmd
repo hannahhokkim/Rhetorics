@@ -14,10 +14,11 @@ library(sjPlot)    # For beautiful tables and plots
 library(broom)
 library(ggpubr)# For tidying model outputs
 library(patchwork)
+library(Hmisc)
 ```
 
 ```{r}
-raw_data <- read_csv("Rhetroics_recoded_survey_data_031836.csv")
+raw_data <- read_csv("../Data/Rhetorics_recoded_survey_data_260318.csv")
 
 df <- raw_data[-c(1, 2), ]
 
