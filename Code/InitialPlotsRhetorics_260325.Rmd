@@ -1,9 +1,10 @@
 ---
 title: "Epistemological Beliefs and Open Science Analysis"
-author: "Analysis Script"
+author: "test"
 date: "`r Sys.Date()`"
 output: html_document
 ---
+##test
 
 ```{r}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
@@ -246,5 +247,10 @@ summary_table <- do.call(rbind, lapply(results, function(res) {
 }))
 
 summary_table
+
+```
+
+##test
+```{r}
 
 ```
