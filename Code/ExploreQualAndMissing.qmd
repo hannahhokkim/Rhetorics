@@ -52,5 +52,10 @@ rm(responses_labels.df)
 ```
 
 ```{r}
+responses_raw.df %>% dplyr::select(c("comments",
+  names(responses_raw.df) %>% 
+  stringr::str_subset("_TEXT$"))) %>% View()
+
+names(responses_raw.df)
 
 ```
