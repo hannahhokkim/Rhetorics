@@ -49,9 +49,41 @@ labelled::var_label(responses_raw.df) <-
     )
 
 rm(responses_labels.df)
+
 ```
 
 ```{r}
+#| label: code-non-unit-missing
+
+# agree to participate : q54 yes
+# filled out positivism scale
+
+responses_clean.df <-
+  responses_raw.df %>% 
+  dplyr::rowwise() %>%
+  dplyr::mutate(
+    unit_missing_INDICATOR = 
+      any(c(is.na(dplyr::c_across(dplyr::starts_with("pos"))),
+            (is.na(`Q54`)|`Q54`!='Yes')))
+  ) %>%
+  dplyr::ungroup()
+
+
+responses_clean.df %>% 
+  dplyr::count(`unit_missing_INDICATOR`)%>%
+  gt::gt()
+
+```
+
+```{r}
+
+
+responses_non_missing.df <- 
+  responses_non_missing.df %>%
+    dplyr::filter(!`unit_missing_INDICATOR`)
+
+responses_clean.df %>% dplyr::select("comments", starts_with("pos"), Q54, unit_missing_INDICATOR) %>% View()
+
 responses_raw.df %>% dplyr::select(c("comments",
   names(responses_raw.df) %>% 
   stringr::str_subset("_TEXT$"))) %>% View()
