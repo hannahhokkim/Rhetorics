@@ -1,0 +1,56 @@
+---
+title: "Exploration of Qualitative Responses and Missing Data"
+format: html
+editor: visual
+code-tools: TRUE
+code-fold: TRUE
+embed-resources: TRUE
+params: 
+  src_d: "../Code/R"
+  data_d: "../Data/"
+---
+
+```{r}
+#| label: setup
+#| include: FALSE
+
+library("conflicted", quietly = TRUE)
+library("magrittr", include.only = c("%<>%","%>%"),
+        quietly = TRUE)
+library("tidyverse", include.only = c() , quietly = TRUE)
+library("gt",include.only=c(), quietly = TRUE)
+library("broom",include.only=c(), quietly = TRUE)
+library("patchwork",include.only=c(), quietly = TRUE)
+library("labelled",include.only=c(), quietly = TRUE)
+```
+
+```{r}
+#| label: read-raw-data
+
+responses_raw.df <- readr::read_csv(
+  file.path(params[["data_d"]], "/Rhetorics_recoded_survey_data_260318.csv"), 
+            col_names=FALSE, skip=3, guess_max=Inf,                        
+            show_col_types = FALSE
+
+)
+
+responses_labels.df <- readr::read_csv(
+  file.path(params[["data_d"]], "/Rhetorics_recoded_survey_data_260318.csv"), 
+            col_names=TRUE, skip=, guess_max=Inf, n_max=2,
+            show_col_types = FALSE
+)
+
+names(responses_raw.df) <- names(responses_labels.df)
+
+labelled::var_label(responses_raw.df) <- 
+  dplyr::coalesce(
+    responses_labels.df[1,] %>% t() %>% as.vector(),
+    names(responses_raw.df)
+    )
+
+rm(responses_labels.df)
+```
+
+```{r}
+
+```
