@@ -8,6 +8,7 @@ embed-resources: TRUE
 params: 
   src_d: "../Code/R"
   data_d: "../Data/"
+  doc_freq_threshold: 4
 ---
 
 ```{r}
@@ -49,13 +50,128 @@ labelled::var_label(responses_raw.df) <-
     )
 
 rm(responses_labels.df)
+
 ```
 
 ```{r}
-responses_raw.df %>% dplyr::select(c("comments",
-  names(responses_raw.df) %>% 
-  stringr::str_subset("_TEXT$"))) %>% View()
+#| label: code-non-unit-missing
 
-names(responses_raw.df)
+# agree to participate : q54 yes
+# filled out positivism scale
+
+responses_clean.df <-
+  responses_raw.df %>% 
+  dplyr::rowwise() %>%
+  dplyr::mutate(
+    unit_missing_INDICATOR = 
+      any(c(is.na(dplyr::c_across(dplyr::starts_with("pos"))),
+            (is.na(`Q54`)|`Q54`!='Yes')))
+  ) %>%
+  dplyr::ungroup()
+
+
+responses_clean.df %>% 
+  dplyr::count(`unit_missing_INDICATOR`)%>%
+  gt::gt()
+
+response_complete.df <- 
+  responses_clean.df %>%
+  dplyr::filter(!`unit_missing_INDICATOR`)
+
+```
+
+```{r}
+#| label: comment-analysis-hand
+
+comments_only.df <-
+  response_complete.df %>%
+  dplyr::select(`ResponseId`,`comments`)
+
+comments_only.df %>% 
+  dplyr::count(is.na(`comments`), sort=TRUE) %>%
+  gt::gt()
+
+comments_only.df %<>%
+  dplyr::filter(!is.na(`comments`))
+
+# for hand-coding
+
+readr::write_excel_csv2(comments_only.df, delim='\t',
+                        file.path(params[["data_d"]],"comments_export.tsv"))
+```
+
+```{r}
+#| label: comment-analysis-ngram
+
+library("tidytext",include.only=c(), quietly = TRUE)
+
+
+clean_text<-function(x) {
+  x %>%  
+    stringr::str_replace_all("U\\.S\\.","USA") %>% 
+    stringr::str_to_lower() %>% 
+    stringr::str_replace_all("[-\\)\\(\\&\"/]"," ") %>%
+    stringr::str_replace_all("[^a-zA-Z \\.']", "")  %>% 
+    stringr::str_squish()
+}
+
+
+comments_only.df %<>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(comments_clean=clean_text(`comments`)) %>%
+  dplyr::ungroup()
+
+minimal_stopwords <-
+  c("a",  "am", "an", "and", "any", "are", "aren't", "as", "at", "be","but", "by",  "did", "didn't", 
+"do", "does", "doesn't", "doing", "don't", "down", "during", 
+"each", "for", "from", "further", "had", "hadn't", "has", 
+"hasn't", "have", "haven't", "having", "how", "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself", "let's", "me", "my", "myself",  "of", "on",  "or", "other",  "so", "than", "that", "that's", "the","their", "they", "them", "then", "there", "there's", "these", "this", "how", "to", "too",  "was", "wasn't", "when", "when's", "where", "where's", "which", "while", "will", "with", "won't")
+
+
+  
+comment_ngram.df <-  comments_only.df %>%
+  dplyr::select(`ResponseId`,`comments_clean`) %>%
+  tidytext::unnest_tokens(ngram, `comments_clean`,
+                token = "skip_ngrams", n = 3 ,k=1,
+                stopwords=minimal_stopwords) %>%
+  dplyr::mutate(ngram = stringr::str_squish(ngram)) %>% 
+  dplyr::filter(str_length(ngram)>1)
+
+ngram_freq.df <- comment_ngram.df %>% 
+  dplyr::count(`ngram`,sort=TRUE) 
+
+ngram_doc_freq.df <- 
+  comment_ngram.df  %>%
+  dplyr::distinct() %>% 
+  dplyr::count(`ngram`, sort=TRUE)
+
+comment_tf_idf <- 
+  comment_ngram.df  %>% 
+  dplyr::semi_join(
+    ngram_doc_freq.df %>% dplyr::filter(n>params[["doc_freq_threshold"]]), 
+    by = "ngram") %>%
+  dplyr::count(`ngram`,`ResponseId`)%>%
+  tidytext::bind_tf_idf(ngram, ResponseId, n)
+
+```
+
+```{r}
+#| label: comment-analysis-plot
+
+library("plotly",include.only=c(), quietly = TRUE)
+
+{ngram_doc_freq.df %>% 
+  dplyr::filter(n>params[["doc_freq_threshold"]]) %>% 
+  ggplot2::ggplot(aes(x=fct_reorder(ngram,n),y=n))+
+   geom_col() +
+  coord_flip() +
+  labs(x="terms occuring in multiple comments")} %>% plotly::ggplotly()
+
+{ngram_doc_freq.df %>% 
+  dplyr::filter(n>5 & stringr::str_detect(ngram," ")) %>% 
+  ggplot2::ggplot(aes(x=fct_reorder(ngram,n),y=n))+
+   geom_col() +
+  coord_flip() +
+  labs(x="terms occuring in multiple comments")} %>% plotly::ggplotly()
 
 ```
