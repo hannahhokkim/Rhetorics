@@ -28,15 +28,17 @@ library("labelled",include.only=c(), quietly = TRUE)
 ```{r}
 #| label: read-raw-data
 
+qualtrics_file <- "Rhetorics_Qualtrics_260401.csv"
+
 responses_raw.df <- readr::read_csv(
-  file.path(params[["data_d"]], "/Rhetorics_recoded_survey_data_260318.csv"), 
+  file.path(params[["data_d"]], qualtrics_file ), 
             col_names=FALSE, skip=3, guess_max=Inf,                        
             show_col_types = FALSE
 
 )
 
 responses_labels.df <- readr::read_csv(
-  file.path(params[["data_d"]], "/Rhetorics_recoded_survey_data_260318.csv"), 
+  file.path(params[["data_d"]], qualtrics_file ), 
             col_names=TRUE, skip=, guess_max=Inf, n_max=2,
             show_col_types = FALSE
 )
@@ -50,7 +52,6 @@ labelled::var_label(responses_raw.df) <-
     )
 
 rm(responses_labels.df)
-
 ```
 
 ```{r}
@@ -174,4 +175,39 @@ library("plotly",include.only=c(), quietly = TRUE)
   coord_flip() +
   labs(x="terms occuring in multiple comments")} %>% plotly::ggplotly()
 
+```
+
+```{r}
+#| label: comment-hand-coded-analysis
+
+hand_coded.df <- readr::read_csv(
+                        file.path(params[["data_d"]],"comments_hand_coded - main.csv"))
+
+hand_coded.df %<>% 
+  dplyr::mutate(dplyr::across(dplyr::everything(), ~tidyr::replace_na(.x, "")))
+
+{ hand_coded.df %>% 
+  dplyr::select(-`ResponseId`, -`comments`) %>%
+  tidyr::pivot_longer(cols=dplyr::everything()) %>%
+  dplyr::mutate(name=ifelse(stringr::str_starts(name,"topic"),"topic", name)) %>%
+  dplyr::count(`name`,`value`) %>%
+  dplyr::filter(value!="") %>% 
+  ggplot2::ggplot() + 
+  ggplot2::aes(x=`name`, y=`n`, fill=`value` ) +
+  ggplot2::geom_bar(stat="identity", position="stack") +
+  ggplot2::coord_flip()
+} %>% plotly::ggplotly()
+   
+  
+
+ create a dataset
+specie <- c(rep("sorgho" , 3) , rep("poacee" , 3) , rep("banana" , 3) , rep("triticum" , 3) )
+condition <- rep(c("normal" , "stress" , "Nitrogen") , 4)
+value <- abs(rnorm(12 , 0 , 15))
+data <- data.frame(specie,condition,value) %>%
+
+ 
+# Stacked
+ggplot(data, aes(fill=condition, y=value, x=specie)) + 
+    geom_bar(position="stack", stat="identity")
 ```
