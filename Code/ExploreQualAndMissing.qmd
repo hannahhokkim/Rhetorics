@@ -7,9 +7,11 @@ code-fold: TRUE
 embed-resources: TRUE
 params: 
   src_d: "../Code/R"
-  data_d: "../Data/"
+  data_d: "../Data"
   doc_freq_threshold: 4
 ---
+
+# setup
 
 ```{r}
 #| label: setup
@@ -30,8 +32,9 @@ ggplot2::theme_set( ggthemes::theme_fivethirtyeight())
 
 ```{r}
 #| label: read-raw-data
-
 qualtrics_file <- "Rhetorics_Qualtrics_260401.csv"
+
+ file.path(params[["data_d"]], qualtrics_file )
 
 responses_raw.df <- readr::read_csv(
   file.path(params[["data_d"]], qualtrics_file ), 
@@ -85,7 +88,7 @@ response_complete.df <-
 ```
 
 ```{r}
-#| label: comment-analysis-hand
+#| label: comment-analysis-hand-extract
 
 comments_only.df <-
   response_complete.df %>%
@@ -103,6 +106,8 @@ comments_only.df %<>%
 readr::write_excel_csv2(comments_only.df, delim='\t',
                         file.path(params[["data_d"]],"comments_export.tsv"))
 ```
+
+# ngram patterns
 
 ```{r}
 #| label: comment-analysis-ngram
@@ -180,6 +185,8 @@ library("plotly",include.only=c(), quietly = TRUE)
 
 ```
 
+# Hand coded labels
+
 ```{r}
 #| label: comment-hand-coded-analysis
 
@@ -201,4 +208,25 @@ hand_coded.df %<>%
   ggplot2::coord_flip() 
   } %>% plotly::ggplotly()
    
+```
+
+# Missing Data
+
+```{r}
+#| label: missing-data-analysis
+library("naniar",include.only=c(), quietly = TRUE)
+library("mice",include.only=c(), quietly = TRUE)
+library("visdat",include.only=c(), quietly = TRUE)
+library("skimr",include.only=c(), quietly = TRUE)
+```
+
+```{r}
+response_complete.df %>% 
+  dplyr::slice_sample(n=10) %>%
+  dplyr::glimpse() 
+```
+
+```{r}
+response_complete.df %>% 
+  skimr::skim() 
 ```
