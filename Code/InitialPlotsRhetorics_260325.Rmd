@@ -18,165 +18,21 @@ library(patchwork)
 library(Hmisc)
 ```
 
-```{r}
-raw_data <- read_csv("../Data/rhetorics_final_field_260401.csv")
-
-```
-
-```{r}
-
-#metadata remove
-
-df <- raw_data[-c(1,2), ]
-
-#scale rescore
-
-df <- df %>%
-  mutate(across(c(pos1:pos5, inc1:inc4, neut1:neut5),
-                ~ dplyr::case_match(
-                  .,
-                  "Strongly disagree" ~ 1,
-                  "Somewhat disagree" ~ 2,
-                  "Neither agree nor disagree" ~ 3,
-                  "Somewhat agree" ~ 4,
-                  "Strongly agree" ~ 5,
-                  .default = NA_real_
-                )))
-
-```
-
-```{r}
 
 
-# Recode opinion outcomes
-opinion_vars <- c("datashare_opinion", "prereg_opinion", "OA_opinion", "replication_opinion")
 
-df <- df %>%
-  mutate(across(all_of(opinion_vars),
-                ~ dplyr::case_match(
-                  str_trim(.),
-                  "Very much against" ~ 1,
-                  "Against" ~ 2,
-                  "Neither in favor nor against" ~ 3,
-                  "In favor" ~ 4,
-                  "Very much in favor" ~ 5,
-                  "No opinion" ~ NA_real_,
-                  .default = NA_real_
-                )))
 
-# Recode behavior outcomes
-behavior_vars <- c("datashare_behavior", "prereg_behavior", "OA_behavior", "replication_behavior")
 
-df <- df %>%
-  mutate(across(all_of(behavior_vars),
-                ~ dplyr::case_match(
-                  str_trim(.),
-                  "Yes" ~ 1,
-                  "No" ~ 0,
-                  "No opinion" ~ NA_real_,
-                  "I do not have a scholarly work that used data" ~ NA_real_,
-                  "I do not have a scholarly work that could have been preregistered" ~ NA_real_,
-                  "I do not have a scholarly work that could have been published open access" ~ NA_real_,
-                  "I do not have a scholarly work that could have been a replication" ~ NA_real_,
-                  .default = NA_real_
-                )))
-
-df <- df %>%
-  mutate(
-    years = as.numeric(years),
-    identifyResearch = as.numeric(identifyResearch),
-    identifyScience = as.numeric(identifyScience),
-    discipline = as.factor(discipline),
-    qualquant = as.factor(qualquant),
-    field = as.factor(field)
-  )
-
-```
-
-```{r}
-
-item_cols <- c(paste0("pos", 1:5), paste0("inc", 1:4), paste0("neut", 1:5))
-outcome_cols <- c("datashare_opinion", "prereg_opinion", "OA_opinion", "replication_opinion",
-                  "datashare_behavior", "prereg_behavior", "OA_behavior", "replication_behavior")
-
-df <- df %>%
-  mutate(across(all_of(c(item_cols, outcome_cols)), as.numeric)) %>%
-  mutate(discipline = as.factor(discipline),
-         qualquant = as.factor(qualquant))
-```
-
-```{r}
-rev_5 <- function(x) { 6 - x }
-
-df <- df %>%
-  mutate(
-    # Inclusivity: Reverse-key 3 and 4
-    inc3_r = rev_5(inc3),
-    inc4_r = rev_5(inc4),
-    # Neutrality: Reverse-key 1 and 3
-    neut1_r = rev_5(neut1),
-    neut3_r = rev_5(neut3)
-  )
-df <- df %>%
-  dplyr::filter(!is.na(field)) %>%
-  mutate(field = case_when(
-    field %in% c("communication", "communications") ~ "Communication",
-    field %in% c("political", "political science") ~ "Political Science",
-    TRUE ~ str_to_title(field) 
-  ))
-
-# Reliability Checks (Cronbach's Alpha)
-alpha_pos  <- psych::alpha(df[paste0("pos", 1:5)])
-alpha_inc  <- psych::alpha(df[c("inc1", "inc2", "inc3_r", "inc4_r")])
-alpha_neut <- psych::alpha(df[c("neut1_r", "neut2", "neut3_r", "neut4", "neut5")])
-
-# Print Alphas
-cat("Cronbach's Alpha Results:\n",
-    "Positivism: ", round(alpha_pos$total$raw_alpha, 2), "\n",
-    "Inclusivity:", round(alpha_inc$total$raw_alpha, 2), "\n",
-    "Neutrality: ", round(alpha_neut$total$raw_alpha, 2), "\n")
-
-df <- df %>%
-  mutate(
-    Positivism = rowMeans(select(., pos1:pos5), na.rm = TRUE),
-    Inclusivity = rowMeans(select(., inc1, inc2, inc3_r, inc4_r), na.rm = TRUE),
-    Neutrality = rowMeans(select(., neut1_r, neut2, neut3_r, neut4, neut5), na.rm = TRUE)
-  )
-```
-
-```{r}
-
-#duplicates
-
-df <- df %>%
-  distinct()
-sum(duplicated(df$ResponseId))
-
-df_dedup <- df %>%
-  mutate(nonmissing_n = rowSums(!is.na(.))) %>%
-  group_by(ResponseId) %>%
-  slice_max(order_by = nonmissing_n, n = 1, with_ties = FALSE) %>%
-  ungroup() %>%
-  select(-nonmissing_n)
-
-sum(duplicated(df_dedup$ResponseId))
-nrow(df_dedup)
-n_distinct(df_dedup$ResponseId)
-
-```
 
 
 ```{r}
+resp_final_complete_clean.df <- readRDS("../Data/responses_final_complete_clean.rds")
 
-sum(duplicated(df_dedup$ResponseId))
-
+df_dedup <-
+  resp_final_complete_clean.df %>%
+  dplyr::mutate(dplyr::across(dplyr::where(is.factor),~  as.numeric(.x)), field=field_first)
 ```
 
-```{r}
-write.csv(df_dedup, "../Data/rhetorics_final_field_260401_clean.csv" )
-
-
-```
 
 
 ```{r}
@@ -227,23 +83,23 @@ epistemic_table <- df_dedup %>%
 print(epistemic_table)
 
 # Create individual plots
-p1 <- ggplot(df, aes(x = reorder(field, Positivism, median, na.rm=TRUE), y = Positivism, fill = field)) +
+p1 <-df_dedup %>% ggplot( aes(x = reorder(field, Positivism, median, na.rm=TRUE), y = Positivism, fill = field)) +
   geom_boxplot(alpha = 0.6, outlier.shape = NA) + geom_jitter(alpha = 0.2, width = 0.2) +
   coord_flip() + theme_minimal() + guides(fill = "none") +
   labs(title = "Positivism by Field", x = "Field", y = "Score")
 
-p2 <- ggplot(df, aes(x = reorder(field, Inclusivity, median, na.rm=TRUE), y = Inclusivity, fill = field)) +
+p2 <- df_dedup %>% ggplot( aes(x = reorder(field, Inclusivity, median, na.rm=TRUE), y = Inclusivity, fill = field)) +
   geom_boxplot(alpha = 0.6, outlier.shape = NA) + geom_jitter(alpha = 0.2, width = 0.2) +
   coord_flip() + theme_minimal() + guides(fill = "none") +
   labs(title = "Inclusivity by Field", x = "", y = "Score")
 
-p3 <- ggplot(df, aes(x = reorder(field, Neutrality, median, na.rm=TRUE), y = Neutrality, fill = field)) +
+p3 <-df_dedup %>% ggplot( aes(x = reorder(field, Neutrality, median, na.rm=TRUE), y = Neutrality, fill = field)) +
   geom_boxplot(alpha = 0.6, outlier.shape = NA) + geom_jitter(alpha = 0.2, width = 0.2) +
   coord_flip() + theme_minimal() + guides(fill = "none") +
   labs(title = "Neutrality by Field", x = "", y = "Score")
 
 final_plot <- (p1 | p2 | p3) + 
-  plot_annotation(
+  patchwork::plot_annotation(
     title = "Epistemological Profiles Across Research Fields",
 
   )
