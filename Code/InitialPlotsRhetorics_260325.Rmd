@@ -4,6 +4,7 @@ author: "test"
 date: "`r Sys.Date()`"
 output: html_document
 ---
+
 ##test
 
 ```{r}
@@ -18,13 +19,6 @@ library(patchwork)
 library(Hmisc)
 ```
 
-
-
-
-
-
-
-
 ```{r}
 resp_final_complete_clean.df <- readRDS("../Data/responses_final_complete_clean.rds")
 
@@ -33,14 +27,14 @@ df_dedup <-
   dplyr::mutate(dplyr::across(dplyr::where(is.factor),~  as.numeric(.x)), field=field_first)
 ```
 
-
-
 ```{r}
 
 # Reliability Checks (Cronbach's Alpha)
 alpha_pos  <- psych::alpha(df_dedup[paste0("pos", 1:5)])
 alpha_inc  <- psych::alpha(df_dedup[c("inc1", "inc2", "inc3_r", "inc4_r")])
 alpha_neut <- psych::alpha(df_dedup[c("neut1_r", "neut2", "neut3_r", "neut4", "neut5")])
+
+
 
 # Print Alphas
 cat("Cronbach's Alpha Results:\n",
@@ -68,7 +62,9 @@ pos_alpha$item.stats
 inc_alpha$item.stats
 neut_alpha$item.stats
 ```
+
 ##DESCRIPTIVES
+
 ```{r}
 epistemic_table <- df_dedup %>%
   group_by(field) %>%
@@ -110,7 +106,7 @@ final_plot
 ```
 
 ```{r}
-method_descriptives <- df %>%
+method_descriptives <- df_dedup %>%
   group_by(qualquant) %>%
   summarise(across(c(Positivism, Inclusivity, Neutrality), 
                    list(M = ~mean(., na.rm = TRUE), SD = ~sd(., na.rm = TRUE))))
@@ -118,7 +114,7 @@ prop_qual_col <- "qualquantField_1"
 
 print(method_descriptives)
 
-belief_corrs_data <- df %>%
+belief_corrs_data <- df_dedup %>%
   select(Positivism, Inclusivity, Neutrality, all_of(prop_qual_col)) %>%
   mutate(across(everything(), ~as.numeric(as.character(.)))) %>%
   drop_na()
@@ -146,6 +142,8 @@ p1 + p2 + p3 + plot_annotation(title = "Epistemological Beliefs by Perceived Dis
 ```
 
 ```{r}
+
+###  BUG: df_long is never defined
 df_plot <- df_long %>%
   dplyr::filter(!is.na(qualquant), !is.na(Score)) %>%
   mutate(Scale = factor(Scale, levels = c("Positivism", "Inclusivity", "Neutrality")))
@@ -170,7 +168,7 @@ ggplot(df_plot, aes(x = Scale, y = Score, fill = qualquant)) +
 os_opinion_items <- c("datashare_opinion", "prereg_opinion", "OA_opinion", "replication_opinion")
 os_behavior_items <- c("datashare_behavior", "prereg_behavior", "OA_behavior", "replication_behavior")
 
-df_os_att <- df %>%
+df_os_att <- df_dedup %>%
   select(field, qualquant, all_of(os_opinion_items)) %>%
   pivot_longer(cols = all_of(os_opinion_items), names_to = "Domain", values_to = "Score")
 
@@ -181,15 +179,13 @@ ggplot(df_os_att, aes(x = field, y = Score, fill = qualquant)) +
 
 ```
 
-
-
-
 Datashare opinion
+
 ```{r}
 vars <- c("datashare_opinion", "field", "qualquant",
           "Positivism", "Inclusivity", "Neutrality")
 
-df2 <- df[complete.cases(df[, vars]), vars]
+df2 <- df_dedup[complete.cases(df_dedup[, vars]), vars]
 
 model_structure <- lm(datashare_opinion ~ field, data = df2)
 model_full <- lm(datashare_opinion ~ field + Positivism + Inclusivity + Neutrality, data = df2)
@@ -206,7 +202,7 @@ outcomes <- c("datashare_opinion", "prereg_opinion", "OA_opinion", "replication_
 results <- lapply(outcomes, function(y) {
   
   vars <- c(y, "field", "Positivism", "Inclusivity", "Neutrality")
-  df2 <- df[complete.cases(df[, vars]), vars]
+  df2 <- df_dedup[complete.cases(df_dedup[, vars]), vars]
   
   m1 <- lm(as.formula(paste(y, "~ field")), data = df2)
   m2 <- lm(as.formula(paste(y, "~ field + Positivism + Inclusivity + Neutrality")), data = df2)
@@ -233,43 +229,44 @@ summary_table
 ```
 
 ##various checks
+
 ```{r}
-dim(df)
-str(df)
-summary(df)
+dim(df_dedup)
+str(df_dedup)
+summary(df_dedup)
 ```
 
 ```{r}
-colnames(df)
+colnames(df_dedup)
 ```
 
 ```{r}
 
-summary(df$Positivism)
-summary(df$Inclusivity)
-summary(df$Neutrality)
+summary(df_dedup$Positivism)
+summary(df_dedup$Inclusivity)
+summary(df_dedup$Neutrality)
 
-table(df$field, useNA = "ifany")
-table(df$qualquant, useNA = "ifany")
+table(df_dedup$field, useNA = "ifany")
+table(df_dedup$qualquant, useNA = "ifany")
 
-summary(df$prereg_opinion)
+summary(df_dedupf$prereg_opinion)
 
 ```
+
 ```{r}
-colSums(is.na(df[c("Positivism", "Inclusivity", "Neutrality",
+colSums(is.na(df_dedup[c("Positivism", "Inclusivity", "Neutrality",
                    "prereg_opinion", "field", "qualquant")]))
 
 ```
 
 ```{r}
-df <- df %>%
+dfm <- df_dedup %>%
   mutate(
     missing_prop = rowMeans(is.na(select(., pos1:pos5, inc1:inc4)))
   )
 
-summary(df$missing_prop)
+summary(dfm$missing_prop)
 
 ```
 
-
-```
+\`\`\`
