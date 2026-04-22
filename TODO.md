@@ -22,4 +22,6 @@
 
 -   ordinal vs continuous vars - cronbach alpha; lm; anova
 
+-   measure cov of attitudes with continuous behavior measure
+
 -   multiple imputation / missing response correction / figure warnings
