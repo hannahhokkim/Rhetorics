@@ -1,0 +1,36 @@
+---
+title: "Exploration of Qualitative Responses and Missing Data"
+format: html
+editor: visual
+code-tools: TRUE
+code-fold: TRUE
+embed-resources: TRUE
+params: 
+  src_d: "../Code/R"
+  data_d: "../Data"
+  doc_freq_threshold: 4
+---
+
+# setup
+
+```{r}
+#| label: setup
+#| include: FALSE
+
+library("conflicted", quietly = TRUE)
+library("magrittr", include.only = c("%<>%","%>%"),
+        quietly = TRUE)
+library("tidyverse", include.only = c() , quietly = TRUE)
+library("gt",include.only=c(), quietly = TRUE)
+library("broom",include.only=c(), quietly = TRUE)
+library("patchwork",include.only=c(), quietly = TRUE)
+library("labelled",include.only=c(), quietly = TRUE)
+library("ggthemes",include.only=c(), quietly = TRUE)
+
+ggplot2::theme_set( ggthemes::theme_fivethirtyeight())
+
+response_complete.df <- readRDS(file.path(params[["data_d"]], 
+                  "responses_final_complete_clean.rds"))
+```
+
+# 
