@@ -28,9 +28,6 @@ library("labelled",include.only=c(), quietly = TRUE)
 library("ggthemes",include.only=c(), quietly = TRUE)
 
 ggplot2::theme_set( ggthemes::theme_fivethirtyeight())
-
-response_complete.df <- readRDS(file.path(params[["data_d"]], 
-                  "responses_final_complete_clean.rds"))
 ```
 
 # Clean data
@@ -188,7 +185,18 @@ responses_clean.df %<>%
           ~ as.numeric(.x)),     na.rm = TRUE)
   )
 
-rm(opinion_vars, behavior_vars , rev_5, item_col, outcome_col, resp_ids.df)
+rm(resp_ids.df)
+
+```
+
+```{r}
+#| label: fix-typos-in-varnames
+ colnames(responses_clean.df) %<>%
+  stringr::str_replace("datasure","datashare") %>%
+  stringr::str_replace('rep_','replication_')
+
+responses_clean.df %<>%
+  dplyr::rename(replication_b_percent_1=replication_b_percen_1 )
 
 ```
 

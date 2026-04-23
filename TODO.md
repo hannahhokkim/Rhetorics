@@ -1,27 +1,29 @@
 **Data cleaning**
 
--   ~~refactor & standardize data cleaning~~
+- ~~refactor & standardize data cleaning~~
 
--   ~~missing data formative analysis~~
+- ~~missing data formative analysis~~
 
--   ~~renv setup~~
+- ~~renv setup~~
 
 **Comment analysis**
 
--   ~~hand-code comments~~
+- ~~hand-code comments~~
 
--   ~~comment term frequency~~
+- ~~comment term frequency~~
 
 **Figures and tables**
 
--   ~~initial figures and tables\\~~
+- ~~initial figures and tables\\~~
 
--   df_long bug
+- df_long bug
 
--   ferguson figures 1,5,6,7
+- ferguson figures 1,5,6,7
 
--   ordinal vs continuous vars - cronbach alpha; lm; anova
+- single respondents with multiple fields robustness
 
--   measure cov of attitudes with continuous behavior measure
+- ordinal vs continuous vars robustness - cronbach alpha; lm; anova
 
--   multiple imputation / missing response correction / figure warnings
+- measure cov of attitudes with continuous behavior measure
+
+- multiple imputation / missing response correction / figure warnings
