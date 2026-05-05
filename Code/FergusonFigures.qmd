@@ -26,6 +26,8 @@ library("broom",include.only=c(), quietly = TRUE)
 library("patchwork",include.only=c(), quietly = TRUE)
 library("labelled",include.only=c(), quietly = TRUE)
 library("ggthemes",include.only=c(), quietly = TRUE)
+library("ggpp",include.only=c(), quietly = TRUE)
+
 
 ggplot2::theme_set( ggthemes::theme_fivethirtyeight())
 
@@ -34,20 +36,17 @@ response_complete.df <- readRDS(file.path(params[["data_d"]],
 ```
 
 ```{r}
-#| label: multiple field check
+#| label: fig data setup
 
 response_complete.df %<>% 
   dplyr::rowwise() %>%
   dplyr::mutate(n_fields = length(field_multi)) %>%
-  dplyr::ungroup() 
-```
-
-```{r}
-#| label: ferg fig 1 support for and engagement in open science by discipline
+  dplyr::ungroup() %>%
+  dplyr::mutate(field= ifelse(n_fields==1, field_first, "multiple"))
 
 scales.v <- c("Positivism", "Inclusivity", "Neutrality")
 open_types.v <- c("OA","datashare","replication","prereg")
-open_measure.v<- c("behavior","opinion","b_percent_1","b_others_1")
+open_measure.v<- c("behavior","opinion","b_percent_1","b_others_1", "b_when_1")
 
 oavars.v<- tidyr::crossing(open_types.v, open_measure.v) %>%
   dplyr::mutate(varname =glue::glue("{x}_{y}",x= open_types.v, y = open_measure.v) ) %>%
@@ -56,10 +55,72 @@ oavars.v<- tidyr::crossing(open_types.v, open_measure.v) %>%
 
 fig_subset.df <-  
   response_complete.df %>% 
-    dplyr::select(`ResponseId`, {{ scales.v }}, {{ oavars.v }} )
+  dplyr::mutate(datashare_b_when_1=NA, prereg_b_when_1=NA) %>%   # MISSING IN SURVEY -- refactor into clean
+    dplyr::select(`ResponseId`, {{ scales.v }}, {{ oavars.v }}, `field_first`, `field` )
 
-colnames(response_complete.df)
+fig_subset_long.df <- 
+  fig_subset.df %>%
+  tidyr::pivot_longer( cols = !c(`ResponseId`,`field`,`field_first`, {{scales.v}})
+                                 , names_to = c("type",".value"),
+                       names_pattern ='(.+?)_(.*)')
+
+colnames(fig_subset_long.df)
+```
+
+```{r}
+#| label: ferg fig 1 analogue
 
 
+{fig_subset_long.df %>%
+  ggplot2::ggplot() + 
+  ggplot2::geom_bar( position = position_fill(), width=.2 , aes(y=type, fill=behavior)) + 
+  ggplot2::geom_bar( inherit.aes=FALSE, aes(y=type, fill=opinion),
+                     position = ggpp::position_fillnudge(y=.3), width=.2)+
+    theme(legend.position = "none")
+  } /
 
+{fig_subset_long.df %>%
+  ggplot2::ggplot() + 
+  ggplot2::geom_bar( position = position_fill(), width=.2 , aes(y=type, fill=behavior)) + 
+  ggplot2::geom_bar( inherit.aes=FALSE, aes(y=type, fill=opinion),
+                     position = ggpp::position_fillnudge(y=.3), width=.2) + 
+  ggplot2::facet_wrap(vars(field))+
+  ggplot2::labs(fill="") +
+  ggplot2::theme(legend.position = "right", legend.direction="vertical")
+  } +
+  patchwork::plot_annotation(title="Actual OS behavior & attitude")
+
+```
+
+```{r}
+#| label: ferg fig 5 analogue
+
+
+{fig_subset_long.df %>%
+  dplyr::summarise(actual = (sum(`behavior`=="Yes", na.rm=TRUE))/
+                                          sum(!is.na(`behavior`)),
+                   perceived = mean(`b_others_1`, na.rm=TRUE)/100,
+                   .groups = "drop")  %>%
+  tidyr::pivot_longer(cols=c("actual","perceived")) %>%
+  dplyr::rename(kind=name, percent=value) %>%
+  ggplot2::ggplot() + 
+  ggplot2::geom_col( position = position_stack(), width=.2 , aes( x=kind, y=percent, fill=kind)) + 
+  ggplot2::coord_flip()+
+  ggplot2::theme(legend.position = "none")
+  } /
+
+{fig_subset_long.df %>%
+  dplyr::group_by(`field`, `type`) %>%
+  dplyr::summarise(actual = (sum(`behavior`=="Yes", na.rm=TRUE))/
+                                          sum(!is.na(`behavior`)),
+                   perceived = mean(`b_others_1`, na.rm=TRUE)/100,
+                   .groups = "drop")  %>%
+  tidyr::pivot_longer(cols=c("actual","perceived")) %>%
+  dplyr::rename(kind=name, percent=value) %>%
+  ggplot2::ggplot() + 
+  ggplot2::geom_col( position = position_stack(), width=.2 , aes( x=kind, y=percent, fill=kind)) + 
+  ggplot2::facet_wrap(vars(field))+
+  ggplot2::coord_flip()+
+  ggplot2::theme(legend.position = "none") } +
+  patchwork::plot_annotation(title="Actual and perceived OS behavior")
 ```
