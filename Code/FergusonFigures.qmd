@@ -56,11 +56,11 @@ oavars.v<- tidyr::crossing(open_types.v, open_measure.v) %>%
 fig_subset.df <-  
   response_complete.df %>% 
   dplyr::mutate(datashare_b_when_1=NA, prereg_b_when_1=NA) %>%   # MISSING IN SURVEY -- refactor into clean
-    dplyr::select(`ResponseId`, {{ scales.v }}, {{ oavars.v }}, `field_first`, `field` )
+    dplyr::select(`ResponseId`, {{ scales.v }}, {{ oavars.v }}, `field_first`, `field`, `qualquant`, `gender` )
 
 fig_subset_long.df <- 
   fig_subset.df %>%
-  tidyr::pivot_longer( cols = !c(`ResponseId`,`field`,`field_first`, {{scales.v}})
+  tidyr::pivot_longer( cols = !c(`ResponseId`,`field`,`field_first`, `qualquant`, `gender`, {{scales.v}})
                                  , names_to = c("type",".value"),
                        names_pattern ='(.+?)_(.*)')
 
@@ -123,4 +123,26 @@ colnames(fig_subset_long.df)
   ggplot2::coord_flip()+
   ggplot2::theme(legend.position = "none") } +
   patchwork::plot_annotation(title="Actual and perceived OS behavior")
+```
+
+```{r}
+#| label: ferg fig 7  analogue
+
+{fig_subset_long.df %>%
+  dplyr::filter(type %in% c("OA", "replication") ) %>%
+  ggplot2::ggplot( aes(x = b_when_1 , color = type)) +
+  ggplot2::stat_ecdf(geom = "line") +
+  ggplot2::labs(y = "Cumulative percentage", x = "Year") +
+  ggplot2::theme(legend.position = "none") } /
+{fig_subset_long.df %>%
+  dplyr::filter(type %in% c("OA", "replication") ) %>%
+  ggplot2::ggplot( aes(x = b_when_1 , color = type)) +
+  ggplot2::stat_ecdf(geom = "line") +
+  ggplot2::labs(y = "Cumulative percentage", x = "Year") + facet_wrap(vars(field))}  /
+  {fig_subset_long.df %>%
+  dplyr::filter(type %in% c("OA", "replication") ) %>%
+  ggplot2::ggplot( aes(x = b_when_1 , color = type)) +
+  ggplot2::stat_ecdf(geom = "line") +
+  ggplot2::labs(y = "Cumulative percentage", x = "Year") + facet_wrap(vars(as.factor(qualquant)))} 
+  patchwork::plot_annotation(title="First year of OA behavior")
 ```
