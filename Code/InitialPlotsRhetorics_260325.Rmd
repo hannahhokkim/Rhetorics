@@ -137,14 +137,15 @@ p3 <- ggplot(belief_corrs_data, aes(x = !!sym(prop_qual_col), y = Neutrality)) +
   theme_minimal() + labs(x = "% Qualitative in Field", y = "", title = "Neutrality")
 
 # Combine
-p1 + p2 + p3 + plot_annotation(title = "Epistemological Beliefs by Perceived Disciplinary Method")
+p1 + p2 + p3 + patchwork::plot_annotation(title = "Epistemological Beliefs by Perceived Disciplinary Method")
 
 ```
 
 ```{r}
 
 ###  BUG: df_long is never defined
-df_plot <- df_long %>%
+if(FALSE) {
+  df_plot <- df_long %>%
   dplyr::filter(!is.na(qualquant), !is.na(Score)) %>%
   mutate(Scale = factor(Scale, levels = c("Positivism", "Inclusivity", "Neutrality")))
 
@@ -160,6 +161,7 @@ ggplot(df_plot, aes(x = Scale, y = Score, fill = qualquant)) +
     fill = "Primary Method"
   ) +
   scale_fill_brewer(palette = "Set2")
+}
 
 ```
 
@@ -206,6 +208,7 @@ results <- lapply(outcomes, function(y) {
   
   m1 <- lm(as.formula(paste(y, "~ field")), data = df2)
   m2 <- lm(as.formula(paste(y, "~ field + Positivism + Inclusivity + Neutrality")), data = df2)
+  print(summary(m2))
   
   list(
     outcome = y,
@@ -249,7 +252,7 @@ summary(df_dedup$Neutrality)
 table(df_dedup$field, useNA = "ifany")
 table(df_dedup$qualquant, useNA = "ifany")
 
-summary(df_dedupf$prereg_opinion)
+summary(df_dedup$prereg_opinion)
 
 ```
 
