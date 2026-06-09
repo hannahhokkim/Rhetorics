@@ -1,0 +1,755 @@
+---
+title: "Rhetorics Analyses From Cleaned Data"
+author: "Hannah Hok Kim"
+date: "`r Sys.Date()`"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: true
+execute:
+  warning: false
+  message: false
+params:
+  data_d: "../Data"
+---
+
+# Setup
+
+```{r}
+required_packages <- c(
+  "tidyverse",
+  "psych",
+  "broom",
+  "knitr",
+  "scales",
+  "patchwork"
+)
+
+missing_packages <- required_packages[
+  !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
+]
+
+if (length(missing_packages) > 0) {
+  stop(
+    "Install missing package(s) before running this notebook: ",
+    paste(missing_packages, collapse = ", ")
+  )
+}
+
+library(tidyverse)
+library(psych)
+library(broom)
+library(knitr)
+library(patchwork)
+
+theme_set(theme_bw())
+
+clean <- readRDS(file.path(params$data_d, "responses_final_complete_clean.rds"))
+
+practice_labels <- c(
+  datashare = "Data sharing",
+  prereg = "Preregistration",
+  OA = "Open access",
+  replication = "Replication"
+)
+
+field_order <- c(
+  "Economics",
+  "Business",
+  "Political Science",
+  "Psychology",
+  "Communications",
+  "Sociology",
+  "Education",
+  "Anthropology"
+)
+
+as_score <- function(x) {
+  if (is.factor(x)) {
+    as.numeric(x)
+  } else {
+    as.numeric(x)
+  }
+}
+
+as_binary_yes <- function(x) {
+  out <- case_when(
+    as.character(x) == "Yes" ~ 1,
+    as.character(x) == "No" ~ 0,
+    TRUE ~ NA_real_
+  )
+  out
+}
+
+round_numeric <- function(data, digits = 2) {
+  data %>%
+    mutate(across(where(is.numeric), ~ round(.x, digits)))
+}
+
+item_score_df <- clean %>%
+  transmute(
+    across(c(pos1:pos5, inc1, inc2, inc3_r, inc4_r, neut1_r, neut2, neut3_r, neut4, neut5), as_score)
+  )
+
+analysis_df <- clean %>%
+  mutate(
+    field = factor(field_first, levels = field_order),
+    n_fields = lengths(field_multi),
+    field_multi_group = if_else(n_fields == 1, as.character(field), "Multiple"),
+    qualquant = fct_drop(qualquant),
+    years_clean = if_else(years > 80, NA_real_, years),
+    across(
+      c(
+        datashare_opinion,
+        prereg_opinion,
+        OA_opinion,
+        replication_opinion
+      ),
+      as_score,
+      .names = "{.col}_score"
+    ),
+    across(
+      c(
+        datashare_behavior,
+        prereg_behavior,
+        OA_behavior,
+        replication_behavior
+      ),
+      as_binary_yes,
+      .names = "{.col}_binary"
+    )
+  )
+
+missing_field_n <- sum(is.na(analysis_df$field))
+field_analysis_df <- analysis_df %>%
+  filter(!is.na(field))
+
+attitude_outcomes <- c(
+  "datashare_opinion_score",
+  "prereg_opinion_score",
+  "OA_opinion_score",
+  "replication_opinion_score"
+)
+
+behavior_outcomes <- c(
+  "datashare_behavior_binary",
+  "prereg_behavior_binary",
+  "OA_behavior_binary",
+  "replication_behavior_binary"
+)
+
+granular_outcomes <- c(
+  "datashare_b_percent_1",
+  "prereg_b_percent_1",
+  "OA_b_percent_1",
+  "replication_b_percent_1",
+  "datashare_b_others_1",
+  "prereg_b_others_1",
+  "OA_b_others_1",
+  "replication_b_others_1",
+  "OA_b_when_1",
+  "replication_b_when_1"
+)
+
+outcome_labels <- c(
+  datashare_opinion_score = "Data sharing attitude",
+  prereg_opinion_score = "Preregistration attitude",
+  OA_opinion_score = "Open access attitude",
+  replication_opinion_score = "Replication attitude",
+  datashare_behavior_binary = "Data sharing behavior",
+  prereg_behavior_binary = "Preregistration behavior",
+  OA_behavior_binary = "Open access behavior",
+  replication_behavior_binary = "Replication behavior",
+  datashare_b_percent_1 = "Data sharing: percent of work",
+  prereg_b_percent_1 = "Preregistration: percent of work",
+  OA_b_percent_1 = "Open access: percent of work",
+  replication_b_percent_1 = "Replication: percent of work",
+  datashare_b_others_1 = "Data sharing: perceived others",
+  prereg_b_others_1 = "Preregistration: perceived others",
+  OA_b_others_1 = "Open access: perceived others",
+  replication_b_others_1 = "Replication: perceived others",
+  OA_b_when_1 = "Open access: timing",
+  replication_b_when_1 = "Replication: timing"
+)
+```
+
+# Sample Characteristics
+
+```{r}
+sample_n <- nrow(analysis_df)
+
+field_counts <- field_analysis_df %>%
+  count(field, sort = TRUE)
+
+method_counts <- analysis_df %>%
+  count(qualquant, sort = TRUE, name = "n") %>%
+  mutate(qualquant = fct_na_value_to_level(qualquant, level = "Missing"))
+
+years_summary <- analysis_df %>%
+  summarise(
+    n = sum(!is.na(years_clean)),
+    mean = mean(years_clean, na.rm = TRUE),
+    sd = sd(years_clean, na.rm = TRUE),
+    median = median(years_clean, na.rm = TRUE),
+    min = min(years_clean, na.rm = TRUE),
+    max = max(years_clean, na.rm = TRUE)
+  )
+
+sample_n
+kable(field_counts, caption = "Analytic sample size by field")
+kable(method_counts, caption = "Analytic sample size by methodological orientation")
+kable(round_numeric(years_summary, 2), caption = "Years of research experience")
+```
+
+```{r}
+ggplot(field_counts, aes(x = fct_reorder(field, n), y = n)) +
+  geom_col(fill = "#4E79A7") +
+  coord_flip() +
+  labs(x = NULL, y = "Respondents", title = "Sample size by field")
+```
+
+```{r}
+ggplot(analysis_df, aes(x = years_clean)) +
+  geom_histogram(binwidth = 2, boundary = 0, fill = "#59A14F", color = "white") +
+  labs(x = "Years of research experience", y = "Respondents")
+```
+
+# Scale Reliability
+
+Neutrality is included in descriptive analyses, but confirmatory models use Positivism and Inclusivity only.
+
+```{r}
+scale_reliability <- tibble(
+  scale = c("Positivism", "Inclusivity", "Neutrality"),
+  alpha = c(
+    psych::alpha(item_score_df[paste0("pos", 1:5)])$total$raw_alpha,
+    psych::alpha(item_score_df[c("inc1", "inc2", "inc3_r", "inc4_r")])$total$raw_alpha,
+    psych::alpha(item_score_df[c("neut1_r", "neut2", "neut3_r", "neut4", "neut5")])$total$raw_alpha
+  )
+) %>%
+  mutate(alpha = round(alpha, 3))
+
+kable(scale_reliability, caption = "Internal consistency of epistemological belief scales")
+```
+
+# H1: Epistemological Beliefs By Field
+
+```{r}
+epistemology_by_field <- field_analysis_df %>%
+  group_by(field) %>%
+  summarise(
+    n = n(),
+    Positivism_M = mean(Positivism, na.rm = TRUE),
+    Positivism_SD = sd(Positivism, na.rm = TRUE),
+    Inclusivity_M = mean(Inclusivity, na.rm = TRUE),
+    Inclusivity_SD = sd(Inclusivity, na.rm = TRUE),
+    Neutrality_M = mean(Neutrality, na.rm = TRUE),
+    Neutrality_SD = sd(Neutrality, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+kable(round_numeric(epistemology_by_field, 2), caption = "Epistemological beliefs by field")
+```
+
+```{r}
+epistemology_long <- field_analysis_df %>%
+  select(ResponseId, field, Positivism, Inclusivity, Neutrality) %>%
+  pivot_longer(
+    cols = c(Positivism, Inclusivity, Neutrality),
+    names_to = "scale",
+    values_to = "score"
+  )
+
+ggplot(epistemology_long, aes(x = field, y = score, fill = field)) +
+  geom_boxplot(outlier.alpha = 0.15) +
+  stat_summary(fun = mean, geom = "point", shape = 23, fill = "white", size = 2.5) +
+  coord_flip() +
+  facet_wrap(~ scale, nrow = 1) +
+  guides(fill = "none") +
+  labs(x = NULL, y = "Scale score")
+```
+
+```{r}
+field_model_tests <- epistemology_long %>%
+  group_by(scale) %>%
+  group_modify(~ {
+    fit <- lm(score ~ field, data = .x)
+    broom::tidy(anova(fit)) %>%
+      filter(term == "field")
+  }) %>%
+  ungroup() %>%
+  mutate(p_bh = p.adjust(p.value, method = "BH"))
+
+kable(field_model_tests, caption = "Field differences in epistemological beliefs")
+```
+
+# H2: Epistemological Beliefs By Methodological Orientation
+
+```{r}
+method_df <- analysis_df %>%
+  filter(!is.na(qualquant))
+
+epistemology_by_method <- method_df %>%
+  group_by(qualquant) %>%
+  summarise(
+    n = n(),
+    Positivism_M = mean(Positivism, na.rm = TRUE),
+    Positivism_SD = sd(Positivism, na.rm = TRUE),
+    Inclusivity_M = mean(Inclusivity, na.rm = TRUE),
+    Inclusivity_SD = sd(Inclusivity, na.rm = TRUE),
+    Neutrality_M = mean(Neutrality, na.rm = TRUE),
+    Neutrality_SD = sd(Neutrality, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+kable(round_numeric(epistemology_by_method, 2), caption = "Epistemological beliefs by methodological orientation")
+```
+
+```{r}
+method_long <- method_df %>%
+  select(ResponseId, qualquant, Positivism, Inclusivity, Neutrality) %>%
+  pivot_longer(
+    cols = c(Positivism, Inclusivity, Neutrality),
+    names_to = "scale",
+    values_to = "score"
+  )
+
+ggplot(method_long, aes(x = qualquant, y = score, fill = qualquant)) +
+  geom_boxplot(outlier.alpha = 0.15) +
+  stat_summary(fun = mean, geom = "point", shape = 23, fill = "white", size = 2.5) +
+  facet_wrap(~ scale, nrow = 1) +
+  guides(fill = "none") +
+  labs(x = "Methodological orientation", y = "Scale score")
+```
+
+```{r}
+method_model_tests <- method_long %>%
+  group_by(scale) %>%
+  group_modify(~ {
+    fit <- lm(score ~ qualquant, data = .x)
+    broom::tidy(anova(fit)) %>%
+      filter(term == "qualquant")
+  }) %>%
+  ungroup() %>%
+  mutate(p_bh = p.adjust(p.value, method = "BH"))
+
+kable(method_model_tests, caption = "Methodological-orientation differences in epistemological beliefs")
+```
+
+# Perceived Methodological Composition Of Field
+
+```{r}
+correlation_table <- function(data, predictor, outcomes) {
+  map_dfr(outcomes, function(outcome) {
+    dat <- data %>%
+      select(all_of(c(predictor, outcome))) %>%
+      drop_na()
+
+    test <- cor.test(dat[[predictor]], dat[[outcome]])
+
+    tibble(
+      outcome = outcome,
+      n = nrow(dat),
+      r = unname(test$estimate),
+      conf_low = test$conf.int[1],
+      conf_high = test$conf.int[2],
+      p = test$p.value
+    )
+  }) %>%
+    mutate(
+      outcome = recode(outcome, !!!outcome_labels),
+      p_bh = p.adjust(p, method = "BH")
+    )
+}
+
+belief_composition_correlations <- correlation_table(
+  analysis_df,
+  predictor = "qualquantField_1",
+  outcomes = c("Positivism", "Inclusivity", "Neutrality")
+)
+
+kable(
+  round_numeric(belief_composition_correlations, 3),
+  caption = "Associations between perceived qualitative composition of field and epistemological beliefs"
+)
+```
+
+```{r}
+analysis_df %>%
+  select(qualquantField_1, Positivism, Inclusivity, Neutrality) %>%
+  pivot_longer(
+    cols = c(Positivism, Inclusivity, Neutrality),
+    names_to = "scale",
+    values_to = "score"
+  ) %>%
+  ggplot(aes(x = qualquantField_1, y = score)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = "lm", se = TRUE) +
+  facet_wrap(~ scale, nrow = 1) +
+  labs(
+    x = "Estimated percent qualitative researchers in field",
+    y = "Epistemological belief score"
+  )
+```
+
+# H3: Open Science Attitudes And Behaviors
+
+```{r}
+attitude_long <- field_analysis_df %>%
+  select(ResponseId, field, all_of(attitude_outcomes)) %>%
+  pivot_longer(
+    cols = all_of(attitude_outcomes),
+    names_to = "outcome",
+    values_to = "score"
+  ) %>%
+  mutate(
+    practice = recode(outcome, !!!outcome_labels)
+  )
+
+behavior_long <- field_analysis_df %>%
+  select(ResponseId, field, all_of(behavior_outcomes)) %>%
+  pivot_longer(
+    cols = all_of(behavior_outcomes),
+    names_to = "outcome",
+    values_to = "behavior"
+  ) %>%
+  mutate(
+    practice = recode(outcome, !!!outcome_labels)
+  )
+
+attitude_summary <- attitude_long %>%
+  group_by(field, practice) %>%
+  summarise(
+    n = sum(!is.na(score)),
+    mean = mean(score, na.rm = TRUE),
+    sd = sd(score, na.rm = TRUE),
+    se = sd / sqrt(n),
+    .groups = "drop"
+  )
+
+behavior_summary <- behavior_long %>%
+  group_by(field, practice) %>%
+  summarise(
+    n = sum(!is.na(behavior)),
+    prop = mean(behavior, na.rm = TRUE),
+    se = sqrt(prop * (1 - prop) / n),
+    .groups = "drop"
+  )
+
+kable(round_numeric(attitude_summary, 2), caption = "Open science attitudes by field")
+kable(round_numeric(behavior_summary, 3), caption = "Open science behaviors by field")
+```
+
+```{r}
+ggplot(attitude_summary, aes(x = mean, y = field, color = practice)) +
+  geom_point(position = position_dodge(width = 0.5), size = 2.5) +
+  geom_errorbar(
+    aes(xmin = mean - se, xmax = mean + se),
+    position = position_dodge(width = 0.5),
+    width = 0.2
+  ) +
+  scale_x_continuous(limits = c(1, 5)) +
+  labs(x = "Mean attitude score", y = NULL, color = "Outcome")
+```
+
+```{r}
+ggplot(behavior_summary, aes(x = prop, y = field, color = practice)) +
+  geom_point(position = position_dodge(width = 0.5), size = 2.5) +
+  geom_errorbar(
+    aes(xmin = pmax(prop - se, 0), xmax = pmin(prop + se, 1)),
+    position = position_dodge(width = 0.5),
+    width = 0.2
+  ) +
+  scale_x_continuous(labels = scales::percent_format()) +
+  labs(x = "Percent reporting behavior", y = NULL, color = "Outcome")
+```
+
+# More Granular Behavioral Measures
+
+These analyses address Micah's note that binary ever/never measures may miss variation in how strongly, regularly, or centrally researchers engage in open science practices.
+
+```{r}
+granular_existing <- granular_outcomes[granular_outcomes %in% names(analysis_df)]
+
+granular_summary <- analysis_df %>%
+  select(ResponseId, field, all_of(granular_existing)) %>%
+  pivot_longer(
+    cols = all_of(granular_existing),
+    names_to = "outcome",
+    values_to = "value"
+  ) %>%
+  mutate(outcome = recode(outcome, !!!outcome_labels)) %>%
+  group_by(outcome) %>%
+  summarise(
+    n = sum(!is.na(value)),
+    mean = mean(value, na.rm = TRUE),
+    sd = sd(value, na.rm = TRUE),
+    median = median(value, na.rm = TRUE),
+    min = min(value, na.rm = TRUE),
+    max = max(value, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+kable(round_numeric(granular_summary, 2), caption = "Granular open science behavior measures")
+```
+
+```{r}
+granular_correlations <- map_dfr(granular_existing, function(outcome) {
+  correlation_table(
+    analysis_df,
+    predictor = "Positivism",
+    outcomes = outcome
+  ) %>%
+    mutate(predictor = "Positivism") %>%
+    bind_rows(
+      correlation_table(
+        analysis_df,
+        predictor = "Inclusivity",
+        outcomes = outcome
+      ) %>%
+        mutate(predictor = "Inclusivity")
+    )
+}) %>%
+  select(outcome, predictor, n, r, conf_low, conf_high, p, p_bh)
+
+kable(
+  round_numeric(granular_correlations, 3),
+  caption = "Associations between epistemological beliefs and granular behavioral measures"
+)
+```
+
+# Confirmatory Nested Models
+
+Confirmatory models exclude Neutrality because its reliability is below the desired threshold.
+
+Model 1 includes field. Model 2 adds methodological orientation. Model 3 adds Positivism and Inclusivity.
+
+```{r}
+make_model_data <- function(data, outcome) {
+  data %>%
+    select(
+      all_of(outcome),
+      field,
+      qualquant,
+      Positivism,
+      Inclusivity
+    ) %>%
+    drop_na()
+}
+
+fit_attitude_models <- function(data, outcome) {
+  dat <- make_model_data(data, outcome)
+
+  m1 <- lm(reformulate("field", response = outcome), data = dat)
+  m2 <- lm(reformulate(c("field", "qualquant"), response = outcome), data = dat)
+  m3 <- lm(
+    reformulate(c("field", "qualquant", "Positivism", "Inclusivity"), response = outcome),
+    data = dat
+  )
+
+  list(
+    outcome = outcome,
+    n = nrow(dat),
+    model1 = m1,
+    model2 = m2,
+    model3 = m3,
+    compare_12 = anova(m1, m2),
+    compare_23 = anova(m2, m3),
+    compare_13 = anova(m1, m3)
+  )
+}
+
+fit_behavior_models <- function(data, outcome) {
+  dat <- make_model_data(data, outcome)
+
+  m1 <- glm(reformulate("field", response = outcome), data = dat, family = binomial)
+  m2 <- glm(reformulate(c("field", "qualquant"), response = outcome), data = dat, family = binomial)
+  m3 <- glm(
+    reformulate(c("field", "qualquant", "Positivism", "Inclusivity"), response = outcome),
+    data = dat,
+    family = binomial
+  )
+
+  list(
+    outcome = outcome,
+    n = nrow(dat),
+    model1 = m1,
+    model2 = m2,
+    model3 = m3,
+    compare_12 = anova(m1, m2, test = "Chisq"),
+    compare_23 = anova(m2, m3, test = "Chisq"),
+    compare_13 = anova(m1, m3, test = "Chisq")
+  )
+}
+
+attitude_models <- set_names(
+  map(attitude_outcomes, ~ fit_attitude_models(analysis_df, .x)),
+  attitude_outcomes
+)
+
+behavior_models <- set_names(
+  map(behavior_outcomes, ~ fit_behavior_models(analysis_df, .x)),
+  behavior_outcomes
+)
+```
+
+```{r}
+attitude_model_comparisons <- map_dfr(attitude_models, function(res) {
+  tibble(
+    outcome = res$outcome,
+    n = res$n,
+    model1_adj_r2 = summary(res$model1)$adj.r.squared,
+    model2_adj_r2 = summary(res$model2)$adj.r.squared,
+    model3_adj_r2 = summary(res$model3)$adj.r.squared,
+    model1_aic = AIC(res$model1),
+    model2_aic = AIC(res$model2),
+    model3_aic = AIC(res$model3),
+    p_12 = res$compare_12$`Pr(>F)`[2],
+    p_23 = res$compare_23$`Pr(>F)`[2],
+    p_13 = res$compare_13$`Pr(>F)`[2]
+  )
+}) %>%
+  mutate(
+    outcome = recode(outcome, !!!outcome_labels),
+    p_12_bh = p.adjust(p_12, method = "BH"),
+    p_23_bh = p.adjust(p_23, method = "BH"),
+    p_13_bh = p.adjust(p_13, method = "BH")
+  )
+
+behavior_model_comparisons <- map_dfr(behavior_models, function(res) {
+  tibble(
+    outcome = res$outcome,
+    n = res$n,
+    model1_aic = AIC(res$model1),
+    model2_aic = AIC(res$model2),
+    model3_aic = AIC(res$model3),
+    p_12 = res$compare_12$`Pr(>Chi)`[2],
+    p_23 = res$compare_23$`Pr(>Chi)`[2],
+    p_13 = res$compare_13$`Pr(>Chi)`[2]
+  )
+}) %>%
+  mutate(
+    outcome = recode(outcome, !!!outcome_labels),
+    p_12_bh = p.adjust(p_12, method = "BH"),
+    p_23_bh = p.adjust(p_23, method = "BH"),
+    p_13_bh = p.adjust(p_13, method = "BH")
+  )
+
+kable(round_numeric(attitude_model_comparisons, 3), caption = "Nested model comparisons for attitudinal outcomes")
+kable(round_numeric(behavior_model_comparisons, 3), caption = "Nested model comparisons for behavioral outcomes")
+```
+
+```{r}
+attitude_epistemology_coefficients <- map_dfr(attitude_models, function(res) {
+  broom::tidy(res$model3, conf.int = TRUE) %>%
+    filter(term %in% c("Positivism", "Inclusivity")) %>%
+    mutate(
+      outcome = res$outcome,
+      n = res$n
+    )
+}) %>%
+  mutate(
+    outcome = recode(outcome, !!!outcome_labels),
+    p_bh = p.adjust(p.value, method = "BH")
+  ) %>%
+  select(outcome, n, term, estimate, conf.low, conf.high, p.value, p_bh)
+
+behavior_epistemology_coefficients <- map_dfr(behavior_models, function(res) {
+  broom::tidy(res$model3, conf.int = TRUE) %>%
+    filter(term %in% c("Positivism", "Inclusivity")) %>%
+    mutate(
+      outcome = res$outcome,
+      n = res$n,
+      odds_ratio = exp(estimate),
+      odds_ratio_low = exp(conf.low),
+      odds_ratio_high = exp(conf.high)
+    )
+}) %>%
+  mutate(
+    outcome = recode(outcome, !!!outcome_labels),
+    p_bh = p.adjust(p.value, method = "BH")
+  ) %>%
+  select(
+    outcome,
+    n,
+    term,
+    estimate,
+    conf.low,
+    conf.high,
+    odds_ratio,
+    odds_ratio_low,
+    odds_ratio_high,
+    p.value,
+    p_bh
+  )
+
+kable(round_numeric(attitude_epistemology_coefficients, 3), caption = "Epistemological belief coefficients from full attitude models")
+kable(round_numeric(behavior_epistemology_coefficients, 3), caption = "Epistemological belief coefficients from full behavior models")
+```
+
+```{r}
+attitude_fit_plot <- attitude_model_comparisons %>%
+  select(outcome, model1_adj_r2, model2_adj_r2, model3_adj_r2) %>%
+  pivot_longer(
+    cols = starts_with("model"),
+    names_to = "model",
+    values_to = "adj_r2"
+  ) %>%
+  mutate(
+    model = recode(
+      model,
+      model1_adj_r2 = "Model 1: field",
+      model2_adj_r2 = "Model 2: + method",
+      model3_adj_r2 = "Model 3: + beliefs"
+    ),
+    model = factor(model, levels = c("Model 1: field", "Model 2: + method", "Model 3: + beliefs"))
+  )
+
+behavior_fit_plot <- behavior_model_comparisons %>%
+  select(outcome, model1_aic, model2_aic, model3_aic) %>%
+  pivot_longer(
+    cols = starts_with("model"),
+    names_to = "model",
+    values_to = "aic"
+  ) %>%
+  mutate(
+    model = recode(
+      model,
+      model1_aic = "Model 1: field",
+      model2_aic = "Model 2: + method",
+      model3_aic = "Model 3: + beliefs"
+    ),
+    model = factor(model, levels = c("Model 1: field", "Model 2: + method", "Model 3: + beliefs"))
+  )
+
+p_attitude_fit <- ggplot(attitude_fit_plot, aes(x = model, y = adj_r2, group = outcome, color = outcome)) +
+  geom_line() +
+  geom_point(size = 2) +
+  labs(x = NULL, y = "Adjusted R-squared", color = "Outcome")
+
+p_behavior_fit <- ggplot(behavior_fit_plot, aes(x = model, y = aic, group = outcome, color = outcome)) +
+  geom_line() +
+  geom_point(size = 2) +
+  labs(x = NULL, y = "AIC", color = "Outcome")
+
+p_attitude_fit / p_behavior_fit
+```
+
+# Manuscript Number Check
+
+Use this section to keep the prose synchronized with the current cleaned file.
+
+```{r}
+current_numbers <- list(
+  analytic_n = nrow(analysis_df),
+  field_counts = field_counts,
+  method_counts = method_counts,
+  years_summary = years_summary,
+  reliability = scale_reliability,
+  attitude_model_comparisons = attitude_model_comparisons,
+  behavior_model_comparisons = behavior_model_comparisons
+)
+
+current_numbers
+```
