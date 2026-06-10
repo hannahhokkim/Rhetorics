@@ -230,7 +230,11 @@ responses_clean.df %<>%
   dplyr::rowwise() %>%
   dplyr::mutate(n_fields = length(field_multi)) %>%
   dplyr::ungroup()%>%
-  dplyr::mutate(field= ifelse(n_fields==1, field_first, "Multiple"))
+  dplyr::mutate(field = ifelse(n_fields==1, field_first, "Multiple"))
+
+responses_clean.df %<>%
+  dplyr::mutate(years_clean = if_else(years > 80, NA_real_, years))
+  
 
 
 ```
@@ -255,7 +259,67 @@ tmp<- responses_clean.df %>%
                   ~ years - (2025-.x),
                   .names = ".{col}_delta"))
 
-tmp %>% dplyr::select("years", contains("when")) %>% View()
+tmp %>% dplyr::select("years", contains("when"))
+
+```
+
+```{r}
+
+field_order <- c(
+  "Economics",
+  "Business",
+  "Political Science",
+  "Psychology",
+  "Communications",
+  "Sociology",
+  "Education",
+  "Anthropology",
+  "Multiple"
+)
+
+as_score <- function(x) {
+  if (is.factor(x)) {
+    as.numeric(x)
+  } else {
+    as.numeric(x)
+  }
+}
+
+as_binary_yes <- function(x) {
+  out <- case_when(
+    as.character(x) == "Yes" ~ 1,
+    as.character(x) == "No" ~ 0,
+    TRUE ~ NA_real_
+  )
+  out
+}
+
+responses_clean.df %<>%
+  mutate(
+    field = factor(field, levels = field_order),
+    field_first=factor(field_first, levels=field_order),
+    qualquant = fct_drop(qualquant),
+    across(
+      c(
+        datashare_opinion,
+        prereg_opinion,
+        OA_opinion,
+        replication_opinion
+      ),
+      as_score,
+      .names = "{.col}_score"
+    ),
+    across(
+      c(
+        datashare_behavior,
+        prereg_behavior,
+        OA_behavior,
+        replication_behavior
+      ),
+      as_binary_yes,
+      .names = "{.col}_binary"
+    )
+  )
 
 ```
 

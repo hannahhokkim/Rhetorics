@@ -42,6 +42,7 @@ library(psych)
 library(broom)
 library(knitr)
 library(patchwork)
+library(conflicted)
 
 theme_set(theme_bw())
 
@@ -92,38 +93,12 @@ item_score_df <- clean %>%
     across(c(pos1:pos5, inc1, inc2, inc3_r, inc4_r, neut1_r, neut2, neut3_r, neut4, neut5), as_score)
   )
 
-analysis_df <- clean %>%
-  mutate(
-    field = factor(field_first, levels = field_order),
-    n_fields = lengths(field_multi),
-    field_multi_group = if_else(n_fields == 1, as.character(field), "Multiple"),
-    qualquant = fct_drop(qualquant),
-    years_clean = if_else(years > 80, NA_real_, years),
-    across(
-      c(
-        datashare_opinion,
-        prereg_opinion,
-        OA_opinion,
-        replication_opinion
-      ),
-      as_score,
-      .names = "{.col}_score"
-    ),
-    across(
-      c(
-        datashare_behavior,
-        prereg_behavior,
-        OA_behavior,
-        replication_behavior
-      ),
-      as_binary_yes,
-      .names = "{.col}_binary"
-    )
-  )
+analysis_df <- clean
+
 
 missing_field_n <- sum(is.na(analysis_df$field))
 field_analysis_df <- analysis_df %>%
-  filter(!is.na(field))
+ dplyr::filter(!is.na(field))
 
 attitude_outcomes <- c(
   "datashare_opinion_score",
@@ -276,7 +251,7 @@ field_model_tests <- epistemology_long %>%
   group_modify(~ {
     fit <- lm(score ~ field, data = .x)
     broom::tidy(anova(fit)) %>%
-      filter(term == "field")
+      dplyr::filter(term == "field")
   }) %>%
   ungroup() %>%
   mutate(p_bh = p.adjust(p.value, method = "BH"))
@@ -288,7 +263,7 @@ kable(field_model_tests, caption = "Field differences in epistemological beliefs
 
 ```{r}
 method_df <- analysis_df %>%
-  filter(!is.na(qualquant))
+  dplyr::filter(!is.na(qualquant))
 
 epistemology_by_method <- method_df %>%
   group_by(qualquant) %>%
@@ -329,7 +304,7 @@ method_model_tests <- method_long %>%
   group_modify(~ {
     fit <- lm(score ~ qualquant, data = .x)
     broom::tidy(anova(fit)) %>%
-      filter(term == "qualquant")
+      dplyr::filter(term == "qualquant")
   }) %>%
   ungroup() %>%
   mutate(p_bh = p.adjust(p.value, method = "BH"))
@@ -643,7 +618,7 @@ kable(round_numeric(behavior_model_comparisons, 3), caption = "Nested model comp
 ```{r}
 attitude_epistemology_coefficients <- map_dfr(attitude_models, function(res) {
   broom::tidy(res$model3, conf.int = TRUE) %>%
-    filter(term %in% c("Positivism", "Inclusivity")) %>%
+    dplyr::filter(term %in% c("Positivism", "Inclusivity")) %>%
     mutate(
       outcome = res$outcome,
       n = res$n
@@ -657,7 +632,7 @@ attitude_epistemology_coefficients <- map_dfr(attitude_models, function(res) {
 
 behavior_epistemology_coefficients <- map_dfr(behavior_models, function(res) {
   broom::tidy(res$model3, conf.int = TRUE) %>%
-    filter(term %in% c("Positivism", "Inclusivity")) %>%
+    dplyr::filter(term %in% c("Positivism", "Inclusivity")) %>%
     mutate(
       outcome = res$outcome,
       n = res$n,

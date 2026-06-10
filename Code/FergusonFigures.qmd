@@ -51,7 +51,8 @@ oavars.v<- tidyr::crossing(open_types.v, open_measure.v) %>%
 
 analysis_subset.df <-  
   response_complete.df %>% 
-    dplyr::select(`ResponseId`, {{ scales.v }}, {{ oavars.v }}, {{ demos.v }} )
+    dplyr::select(`ResponseId`, {{ scales.v }}, {{ oavars.v }}, {{ demos.v }} ) %>%
+    dplyr::filter(!is.na(`field_first`))
 
 analysis_subset_long.df <- 
   analysis_subset.df %>%
@@ -66,20 +67,28 @@ colnames(analysis_subset_long.df)
 #| label: ferg fig 1 analogue
 
 
-{analysis_subset_long.df %>%
+{
   ggplot2::ggplot() + 
-  ggplot2::geom_bar( position = position_fill(), width=.2 , aes(y=type, fill=behavior)) + 
-  ggplot2::geom_bar( inherit.aes=FALSE, aes(y=type, fill=opinion),
+  ggplot2::geom_bar(
+    data = analysis_subset_long.df %>% dplyr::filter(!is.na(behavior)), 
+    position = position_fill(), width=.2 , aes(y=type, fill=behavior)) + 
+  ggplot2::geom_bar( 
+    data = analysis_subset_long.df %>% dplyr::filter(!is.na(opinion)), 
+    inherit.aes=FALSE, aes(y=type, fill=opinion),
                      position = ggpp::position_fillnudge(y=.3), width=.2)+
     theme(legend.position = "none")
-  } /
 
-{analysis_subset_long.df %>%
+} /
+{
   ggplot2::ggplot() + 
-  ggplot2::geom_bar( position = position_fill(), width=.2 , aes(y=type, fill=behavior)) + 
-  ggplot2::geom_bar( inherit.aes=FALSE, aes(y=type, fill=opinion),
+  ggplot2::geom_bar( 
+    data = analysis_subset_long.df %>% dplyr::filter(!is.na(behavior)), 
+    position = position_fill(), width=.2 , aes(y=type, fill=behavior)) + 
+  ggplot2::geom_bar(
+    data = analysis_subset_long.df %>% dplyr::filter(!is.na(opinion)), 
+    inherit.aes=FALSE, aes(y=type, fill=opinion),
                      position = ggpp::position_fillnudge(y=.3), width=.2) + 
-  ggplot2::facet_wrap(vars(field))+
+  ggplot2::facet_wrap(vars(`field_first`))+
   ggplot2::labs(fill="") +
   ggplot2::theme(legend.position = "right", legend.direction="vertical")
   } +
@@ -105,7 +114,8 @@ colnames(analysis_subset_long.df)
   } /
 
 {analysis_subset_long.df %>%
-  dplyr::group_by(`field`, `type`) %>%
+  dplyr::select(field_first, type, behavior)
+  dplyr::group_by(`field_first`, `type`) %>%
   dplyr::summarise(actual = (sum(`behavior`=="Yes", na.rm=TRUE))/
                                           sum(!is.na(`behavior`)),
                    perceived = mean(`b_others_1`, na.rm=TRUE)/100,
@@ -114,15 +124,15 @@ colnames(analysis_subset_long.df)
   dplyr::rename(kind=name, percent=value) %>%
   ggplot2::ggplot() + 
   ggplot2::geom_col( position = position_stack(), width=.2 , aes( x=kind, y=percent, fill=kind)) + 
-  ggplot2::facet_wrap(vars(field))+
+  ggplot2::facet_wrap(vars(field_first))+
   ggplot2::coord_flip()+
   ggplot2::theme(legend.position = "none") } +
   patchwork::plot_annotation(title="Actual and perceived OS behavior")
 ```
 
 ```{r}
-#| label: ferg fig 7  analogue
-
+#| label: ferg-fig7-analogue
+tmp<-
 {analysis_subset_long.df %>%
   dplyr::filter(type %in% c("OA", "replication") ) %>%
   ggplot2::ggplot( aes(x = b_when_1 , color = type)) +
@@ -138,6 +148,9 @@ colnames(analysis_subset_long.df)
   dplyr::filter(type %in% c("OA", "replication") ) %>%
   ggplot2::ggplot( aes(x = b_when_1 , color = type)) +
   ggplot2::stat_ecdf(geom = "line") +
-  ggplot2::labs(y = "Cumulative percentage", x = "Year") + facet_wrap(vars(as.factor(qualquant)))} 
-  patchwork::plot_annotation(title="First year of OA behavior")
+  ggplot2::labs(y = "Cumulative percentage", x = "Year") + facet_wrap(vars(as.factor(qualquant))) } +
+  patchwork::plot_annotation(title="First year of OA behavior") 
+
+tmp
+
 ```
