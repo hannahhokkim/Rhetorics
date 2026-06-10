@@ -82,7 +82,7 @@ resp_ids.df %<>%
   )
 
 resp_ids.df %<>% group_by(ResponseId) %>%
-  summarize(field_multi = list(field), 
+  dplyr::summarize(field_multi = list(field), 
             email_multi = list(email_clean),
             field_first = head(field,1),
             .groups = "drop"
@@ -214,6 +214,48 @@ responses_clean.df %<>%
             (is.na(`Q54`)|`Q54`!='Yes'))),
     ) %>%
   dplyr::ungroup()
+
+```
+
+```{r}
+#| label: substantive cleaning
+
+
+# dummy  missing measures
+responses_clean.df %<>% 
+  dplyr::mutate(datashare_b_when_1=NA, prereg_b_when_1=NA) 
+
+# respondents from multiple fields
+responses_clean.df %<>% 
+  dplyr::rowwise() %>%
+  dplyr::mutate(n_fields = length(field_multi)) %>%
+  dplyr::ungroup()%>%
+  dplyr::mutate(field= ifelse(n_fields==1, field_first, "Multiple"))
+
+
+```
+
+```{r}
+
+
+scales.v <- c("Positivism", "Inclusivity", "Neutrality")
+open_types.v <- c("OA","datashare","replication","prereg")
+open_measure.v<- c("behavior","opinion","b_percent_1","b_others_1", "b_when_1")
+demos.v <- c("field", "field_first", "qualquant", "gender", "years")
+
+oavars.v<- tidyr::crossing(open_types.v, open_measure.v) %>%
+  dplyr::mutate(varname =glue::glue("{x}_{y}",x= open_types.v, y = open_measure.v) ) %>%
+  pull(varname)
+
+oavars.v %>% stringr::str_extract('.*_when_.*') %>% na.omit()
+
+tmp<- responses_clean.df %>% 
+  dplyr::mutate(
+    dplyr::across(oavars.v %>% stringr::str_extract('.*_when_.*') %>% na.omit(),
+                  ~ years - (2025-.x),
+                  .names = ".{col}_delta"))
+
+tmp %>% dplyr::select("years", contains("when")) %>% View()
 
 ```
 

@@ -38,40 +38,35 @@ response_complete.df <- readRDS(file.path(params[["data_d"]],
 ```{r}
 #| label: fig data setup
 
-response_complete.df %<>% 
-  dplyr::rowwise() %>%
-  dplyr::mutate(n_fields = length(field_multi)) %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(field= ifelse(n_fields==1, field_first, "multiple"))
+
 
 scales.v <- c("Positivism", "Inclusivity", "Neutrality")
 open_types.v <- c("OA","datashare","replication","prereg")
 open_measure.v<- c("behavior","opinion","b_percent_1","b_others_1", "b_when_1")
+demos.v <- c("field", "field_first", "qualquant", "gender", "years")
 
 oavars.v<- tidyr::crossing(open_types.v, open_measure.v) %>%
   dplyr::mutate(varname =glue::glue("{x}_{y}",x= open_types.v, y = open_measure.v) ) %>%
   pull(varname)
 
-
-fig_subset.df <-  
+analysis_subset.df <-  
   response_complete.df %>% 
-  dplyr::mutate(datashare_b_when_1=NA, prereg_b_when_1=NA) %>%   # MISSING IN SURVEY -- refactor into clean
-    dplyr::select(`ResponseId`, {{ scales.v }}, {{ oavars.v }}, `field_first`, `field`, `qualquant`, `gender` )
+    dplyr::select(`ResponseId`, {{ scales.v }}, {{ oavars.v }}, {{ demos.v }} )
 
-fig_subset_long.df <- 
-  fig_subset.df %>%
-  tidyr::pivot_longer( cols = !c(`ResponseId`,`field`,`field_first`, `qualquant`, `gender`, {{scales.v}})
+analysis_subset_long.df <- 
+  analysis_subset.df %>%
+  tidyr::pivot_longer( cols = !c(`ResponseId`,`field`,`field_first`, `qualquant`, `gender`, {{scales.v}}, {{demos.v}})
                                  , names_to = c("type",".value"),
                        names_pattern ='(.+?)_(.*)')
 
-colnames(fig_subset_long.df)
+colnames(analysis_subset_long.df)
 ```
 
 ```{r}
 #| label: ferg fig 1 analogue
 
 
-{fig_subset_long.df %>%
+{analysis_subset_long.df %>%
   ggplot2::ggplot() + 
   ggplot2::geom_bar( position = position_fill(), width=.2 , aes(y=type, fill=behavior)) + 
   ggplot2::geom_bar( inherit.aes=FALSE, aes(y=type, fill=opinion),
@@ -79,7 +74,7 @@ colnames(fig_subset_long.df)
     theme(legend.position = "none")
   } /
 
-{fig_subset_long.df %>%
+{analysis_subset_long.df %>%
   ggplot2::ggplot() + 
   ggplot2::geom_bar( position = position_fill(), width=.2 , aes(y=type, fill=behavior)) + 
   ggplot2::geom_bar( inherit.aes=FALSE, aes(y=type, fill=opinion),
@@ -96,7 +91,7 @@ colnames(fig_subset_long.df)
 #| label: ferg fig 5 analogue
 
 
-{fig_subset_long.df %>%
+{analysis_subset_long.df %>%
   dplyr::summarise(actual = (sum(`behavior`=="Yes", na.rm=TRUE))/
                                           sum(!is.na(`behavior`)),
                    perceived = mean(`b_others_1`, na.rm=TRUE)/100,
@@ -109,7 +104,7 @@ colnames(fig_subset_long.df)
   ggplot2::theme(legend.position = "none")
   } /
 
-{fig_subset_long.df %>%
+{analysis_subset_long.df %>%
   dplyr::group_by(`field`, `type`) %>%
   dplyr::summarise(actual = (sum(`behavior`=="Yes", na.rm=TRUE))/
                                           sum(!is.na(`behavior`)),
@@ -128,18 +123,18 @@ colnames(fig_subset_long.df)
 ```{r}
 #| label: ferg fig 7  analogue
 
-{fig_subset_long.df %>%
+{analysis_subset_long.df %>%
   dplyr::filter(type %in% c("OA", "replication") ) %>%
   ggplot2::ggplot( aes(x = b_when_1 , color = type)) +
   ggplot2::stat_ecdf(geom = "line") +
   ggplot2::labs(y = "Cumulative percentage", x = "Year") +
   ggplot2::theme(legend.position = "none") } /
-{fig_subset_long.df %>%
+{analysis_subset_long.df %>%
   dplyr::filter(type %in% c("OA", "replication") ) %>%
   ggplot2::ggplot( aes(x = b_when_1 , color = type)) +
   ggplot2::stat_ecdf(geom = "line") +
   ggplot2::labs(y = "Cumulative percentage", x = "Year") + facet_wrap(vars(field))}  /
-  {fig_subset_long.df %>%
+  {analysis_subset_long.df %>%
   dplyr::filter(type %in% c("OA", "replication") ) %>%
   ggplot2::ggplot( aes(x = b_when_1 , color = type)) +
   ggplot2::stat_ecdf(geom = "line") +
