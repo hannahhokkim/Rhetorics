@@ -64,7 +64,7 @@ colnames(analysis_subset_long.df)
 ```
 
 ```{r}
-#| label: ferg fig 1 analogue
+#| label: ferg-1 type figure 
 
 
 {
