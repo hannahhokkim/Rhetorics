@@ -98,22 +98,18 @@ colnames(analysis_subset_long.df)
 tmp<-
 {analysis_subset_long.df %>%
   dplyr::filter(type %in% c("OA", "replication") ) %>%
-  dplyr::filter(b_when_1 > 1950) %>% # convert to missing earlier
   ggplot2::ggplot( aes(x = b_when_1 , color = type)) +
   ggplot2::stat_ecdf(geom = "line") +
   ggplot2::labs(y = "Cumulative percentage", x = "Year") +
   ggplot2::theme(legend.position = "none") } /
 {analysis_subset_long.df %>%
   dplyr::filter(type %in% c("OA", "replication") ) %>%
-    dplyr::filter(b_when_1 > 1950) %>% # convert to missing earlier
-
   ggplot2::ggplot( aes(x = b_when_1 , color = type)) +
   ggplot2::stat_ecdf(geom = "line") +
   ggplot2::labs(y = "Cumulative percentage", x = "Year") + facet_wrap(vars(field_first))}  /
   {analysis_subset_long.df %>%
   dplyr::filter(type %in% c("OA", "replication"), 
                 !is.na(qualquant)) %>%
-      dplyr::filter(b_when_1 > 1950) %>% # convert to missing earlier
   ggplot2::ggplot( aes(x = b_when_1 , color = type)) +
   ggplot2::stat_ecdf(geom = "line") +
   ggplot2::labs(y = "Cumulative percentage", x = "Year") + facet_wrap(vars(as.factor(qualquant))) } +
