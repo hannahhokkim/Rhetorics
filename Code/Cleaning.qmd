@@ -223,7 +223,7 @@ responses_clean.df %<>%
 
 # dummy  missing measures
 responses_clean.df %<>% 
-  dplyr::mutate(datashare_b_when_1=NA, prereg_b_when_1=NA) 
+  dplyr::mutate(datashare_b_when_1=NA_real_, prereg_b_when_1=NA_real_) 
 
 # respondents from multiple fields
 responses_clean.df %<>% 
@@ -259,8 +259,16 @@ tmp<- responses_clean.df %>%
                   ~ years - (2025-.x),
                   .names = ".{col}_delta"))
 
-tmp %>% dplyr::select("years", contains("when"))
 
+
+# 1950 is default value ==> someone didn't answer the question
+responses_clean.df %<>%
+  dplyr::mutate(
+    dplyr::across(oavars.v %>% stringr::str_extract('.*_when_.*') %>% na.omit(),
+                  ~ na_if( .x, 1950))
+  )
+
+  
 ```
 
 ```{r}
