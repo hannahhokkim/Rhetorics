@@ -347,6 +347,13 @@ saveRDS(response_complete.df,
 ```
 
 ```{r}
+response_complete.df  %>%
+  dplyr::count(field_first) %>% 
+  gt::gt() %>%
+  gt::tab_header("complete entries by field")
+```
+
+```{r}
 #| label: comment-analysis-hand-extract
 # generate extract for hand-coding
 
